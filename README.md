@@ -81,10 +81,27 @@ A standalone **Budget** table (Category, Budget Amount) was created with no form
 - **Top 10 Products by Sales** — `IF(RANKX(ALL(Product[Product Name]), [Total Sales]) <= 10, [Total Sales])` — Shows sales value only for the top 10 ranked products.
 - **Product Rank within Category** — `RANKX(FILTER(ALL(Product), Product[Category] = MAX(Product[Category])), [Total Sales])` — Product's sales rank within its own category.
 - **High Value Customer** — `IF([Total Sales] > 50000, "Yes", "No")` — Flags customers with sales above a threshold.
-- **Customer Segment** *(VAR)* — `VAR CustSales = [Total Sales] RETURN SWITCH(TRUE(), CustSales >= 100000, "Gold", CustSales >= 50000, "Silver", CustSales > 0, "Bronze", "No Sales")` — Tiered customer segment label based on sales.
+- **Customer Segment** *(VAR)* — `VAR CustSales = [Total Sales] RETURN SWITCH(TRUE(), CustSales >= 100000, "Gold", CustSales >= 50000, "Silver", CustSales > 0, "Bronze", "No Sales")` — Tiered customer segment label based on sales. *(Legacy measure — see Week 3 note; the Customer Segment used on report visuals is now a calculated column on the Customer table.)*
 - **Days Since Last Purchase** — `DATEDIFF(CALCULATE(MAX(Sales[Order Date Key]), ALLEXCEPT(Sales, Sales[Customer Key])), TODAY(), DAY)` — Days elapsed since a customer's most recent order.
 - **Budget Attainment %** — `DIVIDE([Total Sales], [Budget Amount by Category], 0)` — Actual sales as a % of budget.
-- **Pareto %** *(VAR)* — cumulative % of total sales contributed, ranked by product (80/20 analysis).
+- **Pareto %** *(VAR)* —
+```DAX
+  Pareto % =
+  VAR RunningTotal =
+      CALCULATE(
+          [Total Sales],
+          FILTER(
+              ALL(Product[Product Name]),
+              RANKX(ALL(Product[Product Name]), [Total Sales]) <=
+                  RANKX(ALL(Product[Product Name]), [Total Sales])
+          )
+      )
+  VAR GrandTotal =
+      CALCULATE([Total Sales], ALL(Product))
+  RETURN
+      DIVIDE(RunningTotal, GrandTotal, 0)
+```
+  Cumulative % of total sales contributed by products at or above the current product's sales rank, used for 80/20 (Pareto) analysis.
 
 ### CALCULATE Deep Dive
 Three measures were rewritten to use explicit CALCULATE with modifiers, each documented inline with a comment explaining the filter context before and after:
@@ -121,10 +138,12 @@ Two patterns were implemented on the Sales Analysis page:
 1. **Bar/line chart toggle** — the "Total Sales by Category" chart exists in two versions (bar and line), stacked in the same position via the Selection Pane. Two bookmarks ("Show Bar", "Show Line") capture each visibility state, grouped together under a "Chart Toggle" bookmark group so they don't interfere with the page-navigation bookmarks. A "Switch View" button is wired to the "Show Line" bookmark via an Action → Bookmark interaction.
 
 2. **Measure-driven empty state** — a Card visual (rather than a text box, which does not support visual-level filtering in this Power BI version) is bound to a dedicated measure:
-   ```DAX
+```DAX
    No Data Message = IF(ISBLANK([Total Sales]), "No data available for the selected filters", BLANK())
-   ```
+```
    The Card only displays text when `Total Sales` is blank for the current filter context, and is otherwise empty — no bookmark required. **Root cause note:** this Card initially threw a repeated "Error fetching data for this visual" error; the cause was the Time Intelligence Calculation Group slicer on the same page cross-filtering the text-based measure (its calculation items attempt numeric operations on `SELECTEDMEASURE()`, which breaks on non-numeric output). The fix was ensuring the Calculation Group slicer is set to **Current Period** for this Card's context.
+
+   A related measure, **Show No Data Message** — `IF(ISBLANK([Total Sales]), 1, 0)` — returns a 1/0 flag version of the same condition, used to drive visual-level filtering (rather than the text output itself) where a numeric flag is more convenient than a text-blank check.
 
 ### Customer Analysis Page
 - Top 20 Customers table (Customer Name, Customer Segment, Days Since Last Purchase, Total Sales), sorted descending by Total Sales, with a Top 20 data limit and `[Not Applicable]` rows excluded via a page-level filter.
@@ -135,8 +154,27 @@ Two patterns were implemented on the Sales Analysis page:
 
 **Bugs fixed on this page:**
 - *Days Since Last Purchase* originally used `DATEDIFF` against `Sales[Order Date Key]` (a numeric surrogate key, not a real date), which errored out. Fixed by referencing `Calendar[Date]` via `RELATEDTABLE`/`RELATED` instead of `ALLEXCEPT`.
-- *Customer Segment* was originally a measure, which meant it couldn't be placed on a chart axis (axes require columns) and, when first converted to a calculated column using `ALLEXCEPT`, incorrectly returned "Gold" for every customer. Fixed by rebuilding it as a calculated column on the Customer table using a plain `CALCULATE([Total Sales])`, relying on relationship context transition rather than `ALLEXCEPT`. The original measure was kept and renamed "Customer Segment (Legacy)" to avoid a naming clash.
-- *High Value Customer Count* returned 1 despite looking correct; the single row crossing the 50,000 threshold turned out to be the `[Not Applicable]` customer row, not a real customer (real customers top out around ₹15–17K). The measure was updated to exclude `[Not Applicable]` and wrapped in `IF(ISBLANK(...), 0, ...)` so it displays cleanly as 0. **Business insight:** by this dataset's numbers, no real customer currently qualifies as "high value" — worth surfacing in the Week 4 business insights summary.
+- *Customer Segment* was originally a measure, which meant it couldn't be placed on a chart axis (axes require columns) and, when first converted to a calculated column using `ALLEXCEPT`, incorrectly returned "Gold" for every customer. Fixed by rebuilding it as a calculated column on the Customer table using a plain `CALCULATE([Total Sales])`, relying on relationship context transition rather than `ALLEXCEPT`. The original measure was kept (unchanged, in the `measures` table) as a reference implementation of the VAR/SWITCH pattern for Week 2's Ranking & Segmentation requirement; the calculated column on Customer is what report visuals actually use.
+- *High Value Customer Count* returned 1 despite looking correct; the single row crossing the 50,000 threshold turned out to be the `[Not Applicable]` customer row, not a real customer (real customers top out around ₹15–17K). The measure was rewritten to explicitly exclude `[Not Applicable]` and only count Silver/Gold-segment customers:
+```DAX
+  High Value Customer Count =
+  IF(
+      ISBLANK(
+          CALCULATE(
+              DISTINCTCOUNT(Customer[Customer Key]),
+              Customer[Customer Segment] IN {"Silver", "Gold"},
+              Customer[Customer Name] <> "[Not Applicable]"
+          )
+      ),
+      0,
+      CALCULATE(
+          DISTINCTCOUNT(Customer[Customer Key]),
+          Customer[Customer Segment] IN {"Silver", "Gold"},
+          Customer[Customer Name] <> "[Not Applicable]"
+      )
+  )
+```
+  It now displays cleanly as 0. **Business insight:** by this dataset's numbers, no real customer currently qualifies as Silver or Gold tier — worth surfacing in the Week 4 business insights summary.
 
 ### Product Detail Drill-Through Page
 A 5th, hidden page with drill-through enabled on `Product[Product Name]`. Right-clicking a product name anywhere in the report opens this page filtered to that product. It shows:
@@ -184,11 +222,12 @@ Breaking down the Matrix and Slicer durations showed that the DAX query time its
 **Optimisation:** The Matrix was carrying four Calculation-Group-driven measures (Total Sales, Gross Profit, Sales YoY Change %, Gross Profit Margin %). Removing one column — **Gross Profit Margin %** — and re-running Performance Analyser dropped the Matrix's duration from **7675ms to roughly 726–927ms**, an approximately 8x improvement. This confirms that each additional Calculation-Group-driven measure in a single visual adds real, avoidable rendering cost, and that trimming a visual's measure count is an effective, low-risk optimisation.
 
 ### Advanced Power Query
-The **Budget** and **Product** queries were combined using **Merge Queries** (Home → Merge Queries), joining on the shared `Category` column with a **Left Outer** join (all rows from Budget, matching rows from Product). The resulting `Product` column was expanded to bring in a matching product-level field.
+The **Product** and **Budget** queries were combined using **Merge Queries** (Home → Merge Queries), with **Product as the base query** and **Budget merged in**, joined on the shared `Category` column with a **Left Outer** join (all rows from Product, matching rows from Budget). The resulting `Budget` column was expanded to bring in just `Budget Amount`.
 
-A custom column, **Budget Status**, was then added using Add Column → Custom Column with an if-then-else expression in M:
-```
+**Why the merge direction matters:** the first attempt merged Product into Budget (Budget as the base query). Since many products share a single category, this duplicated Budget's rows — one row per matching product instead of one row per category — which broke Budget's row uniqueness on `Category`, the exact column the Week 2 TREATAS relationship (`Budget Amount by Category`) depends on to filter correctly. The fix was reversing the merge direction: Product as the base, Budget's `Budget Amount` pulled in as a lookup column. This keeps Product's row count unchanged (397 rows, unduplicated) and leaves Budget's table structure — and the TREATAS measures built on it — untouched.
+
+A custom column, Budget Status, was then added using Add Column → Custom Column with an if-then-else expression in M:
+
 if [Budget Amount] > 10000000 then "High Budget" else "Standard Budget"
-```
 
-**Why this was done in Power Query rather than DAX:** the merge and the "Budget Status" label are structural, one-time transformations of the data itself, not calculations that need to respond to filter context or user interaction. Power Query runs once at refresh time and produces a static shaped table, which is more efficient than recalculating a row-level classification with DAX on every visual interaction. DAX measures are reserved for aggregations that must react dynamically to slicers and filters; static row-level labels like "High Budget"/"Standard Budget" belong in the data layer, not the calculation layer.
+Why this was done in Power Query rather than DAX: the merge and the "Budget Status" label are structural, one-time transformations of the data itself, not calculations that need to respond to filter context or user interaction. Power Query runs once at refresh time and produces a static shaped table, which is more efficient than recalculating a row-level classification with DAX on every visual interaction. DAX measures are reserved for aggregations that must react dynamically to slicers and filters; static row-level labels like "High Budget"/"Standard Budget" belong in the data layer, not the calculation layer.
