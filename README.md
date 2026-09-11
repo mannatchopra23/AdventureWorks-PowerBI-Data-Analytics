@@ -191,8 +191,8 @@ Did this in Power Query rather than DAX because it's a one-time structural label
 
 **Business insights summary** - wrote up 5 findings with real numbers from the report, 3 recommendations, and 2 things I'd want to dig into further with more data. See [business-insights-summary.pdf](business-insights-summary.pdf).
 
-**Data dictionary** - every table, every column (type + what it means), and every measure with its exact formula, checked directly against the live .pbix rather than assumed from this README. See [data-dictionary.docx](data-dictionary.docx).
+**Data dictionary** - every table, every column (type + what it means), and every measure with its exact formula, checked directly against the live .pbix rather than assumed from this README. See [data-dictionary.pdf](data-dictionary.pdf).
 
 **Video walkthrough** - link above once recorded.
 
-**Self-assessment** - see [self-assessment.docx](self-assessment.docx) - skill ratings (Beginner / Developing / Proficient / Strong) per area, plus a reflection on the hardest part of the build.
+**Self-assessment** - see [self-assessment.pdf](self-assessment.pdf) - skill ratings (Beginner / Developing / Proficient / Strong) per area, plus a reflection on the hardest part of the build.
