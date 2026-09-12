@@ -2,7 +2,7 @@
 
 ## What this is
 
-This is my AdventureWorks Power BI project - a 4-week build covering data modelling, DAX, Power Query, report design, and enterprise features like RLS and performance tuning. I built a star schema, wrote 27 DAX measures, put together a 5-page report with calculation groups and field parameters, set up row-level security, and did a performance pass with Power Query cleanup at the end.
+This is my AdventureWorks Power BI project - a 4-week build covering data modelling, DAX, Power Query, report design, and enterprise features like RLS and performance tuning. I built a star schema, wrote 28 DAX measures, put together a 5-page report with calculation groups and field parameters, set up row-level security, and did a performance pass with Power Query cleanup at the end.
 
 - File: `mannatbi.pbix`
 - Dataset: AdventureWorks (Microsoft's free sample)
