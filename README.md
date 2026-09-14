@@ -21,7 +21,7 @@ This is my AdventureWorks Power BI project - a 4-week build covering data modell
 ![Model view](assets/model-screenshot.png)
 
 ## Video walkthrough
-*[Loom link goes here]*
+[Watch the walkthrough on Loom](https://www.loom.com/share/2988de1f1aa94f219ef0830fb877b5e6)
 
 ---
 
