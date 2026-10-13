@@ -2,7 +2,7 @@
 
 ## What this is
 
-This is my AdventureWorks Power BI project - a 4-week build covering data modelling, DAX, Power Query, report design, and enterprise features like RLS and performance tuning. I built a star schema, wrote 28 DAX measures, put together a 5-page report with calculation groups and field parameters, set up row-level security, and did a performance pass with Power Query cleanup at the end.
+This is my AdventureWorks Power BI project - a 4-week build covering data modelling, DAX, Power Query, report design, and enterprise features like RLS and performance tuning. I built a star schema, wrote 32 DAX measures, put together a 6-page report with calculation groups and field parameters, set up row-level security, and did a performance pass with Power Query cleanup at the end.
 
 - File: `mannatbi.pbix`
 - Dataset: AdventureWorks (Microsoft's free sample)
@@ -22,6 +22,8 @@ This is my AdventureWorks Power BI project - a 4-week build covering data modell
 
 ## Video walkthrough
 [Watch the walkthrough on Loom](https://www.loom.com/share/2988de1f1aa94f219ef0830fb877b5e6)
+
+This video was recorded before I added the Returns page and tidied the layouts, so it shows the earlier version of the report.
 
 ---
 
@@ -50,9 +52,9 @@ Total Sales = SUM(Sales[Sales Amount])
 
 ## Week 2 - DAX Measures, Time Intelligence & Advanced Calculations
 
-Target was 25+ measures. Ended up with 28, all in a dedicated Measures table.
+Target was 25+ measures. Ended up with 28 at the original build, and 32 after I added the Returns measures later (see the Returns section at the bottom). All of them are in a dedicated Measures table.
 
-Note: there's no Returns table in this dataset, so Total Returns and Return Rate % from the original plan just aren't buildable here - I skipped them rather than fake something.
+Note: there's no Returns table in the AdventureWorks dataset, so at first I skipped Total Returns and Return Rate % rather than fake something. I later added a simulated Returns table and built those measures - see "Returns data and layout changes" at the bottom.
 
 **Foundation**
 - Total Sales - `SUM(Sales[Sales Amount])`
@@ -120,15 +122,15 @@ Rewrote three measures with explicit modifiers and commented each one on what th
 - Has Sales - KEEPFILTERS + RELATEDTABLE checks related rows without overriding existing filters
 - Budget Amount by Category - ALL(Budget) clears prior filters before TREATAS cross-filters from Product
 
-28 measures total. I also had a dead helper measure, Show No Data Message, that I ended up deleting - see the Week 4 cleanup note.
+28 measures at this stage (32 after the Returns additions). I also had a dead helper measure, Show No Data Message, that I ended up deleting - see the Week 4 cleanup note.
 
 ---
 
 ## Week 3 - Report Design, UX & Advanced Visuals
 
-Built out a 5-page report.
+Built out a 5-page report (a 6th page, Returns Analysis, was added later).
 
-**Executive Summary** - 5 KPI cards (Total Sales, Gross Profit %, Sales YoY Change %, Total Orders, Total Customers - swapped Return Rate % out since there's no Returns table), a monthly sales line chart with a prior-year comparison line (sorted by Month Number since Month Name alone sorts alphabetically), and a Sales by Territory bar chart across all 10 regions. Added a Page Navigator and built a mobile layout for this page.
+**Executive Summary** - 5 KPI cards (Total Sales, Gross Profit Margin %, Sales YoY Change %, Total Orders, Return Rate %), a monthly sales line chart with a prior-year comparison line (sorted by Month Number since Month Name alone sorts alphabetically), and a Sales by Territory bar chart across all 10 regions. The fifth card was Total Customers at first, because there was no Returns table, and I swapped it once I added one. Added a Page Navigator and built a mobile layout for this page.
 
 **Calculation groups** - Built a Time Intelligence calc group in Tabular Editor 3 with six items: Current Period, Prior Year, YoY Change $, YoY Change %, YTD, MTD. Each wraps `SELECTEDMEASURE()` with the relevant pattern. The point of doing this instead of writing separate YTD/PY/YoY measures for every metric is that one slicer now flips the time-period behaviour for every measure on the page at once - way less duplicated logic to maintain. Applied it to Sales Analysis and the Tooltip page.
 
@@ -187,12 +189,54 @@ Did this in Power Query rather than DAX because it's a one-time structural label
 - Renamed the Customer Segment measure to Customer Segment (Legacy) to stop it clashing with the calculated column of the same name.
 - Deleted the Show No Data Message measure - it was a failed alternative approach from Week 3 that never worked and was just sitting there unused.
 
-28 measures total in the model now.
+28 measures total in the model at that point (32 now - see the Returns section below).
 
 **Business insights summary** - wrote up 5 findings with real numbers from the report, 3 recommendations, and 2 things I'd want to dig into further with more data. See [business-insights-summary.pdf](business-insights-summary.pdf).
 
 **Data dictionary** - every table, every column (type + what it means), and every measure with its exact formula, checked directly against the live .pbix rather than assumed from this README. See [data-dictionary.pdf](data-dictionary.pdf).
 
-**Video walkthrough** - link above once recorded.
+**Video walkthrough** - see the Loom link near the top of this page.
 
 **Self-assessment** - see [self-assessment.pdf](self-assessment.pdf) - skill ratings (Beginner / Developing / Proficient / Strong) per area, plus a reflection on the hardest part of the build.
+
+---
+
+## Returns data and layout changes (added after the first submission)
+
+Two changes came after the original build: a Returns table, and a cleaner layout across the report.
+
+### Simulated Returns table
+
+AdventureWorks has no real returns data, so I made a simulated Returns table in Power Query. It takes a random 8% of the rows in Sales and treats each one as a returned order line. For each one it adds a random return reason (Defective Product, Wrong Item Shipped, Changed Mind, Not as Described, or Damaged in Transit), a random 3 to 30 days between the order and the return, a return date, and a return quantity that's never more than what was ordered. I also added a Return Month calculated column so the monthly trend chart works.
+
+Because the data is random, two things are worth knowing:
+- The numbers shift a little every time the data refreshes (around 9,800 returns and about 8% of orders at the moment).
+- The five return reasons come out almost equal, and no category or region stands out. That's a result of how I simulated it, not a real finding, so I haven't drawn any business conclusions from it.
+
+Returns links to Sales on Sales Order Line Key as a one-to-one relationship. Because Sales already connects to Product and SalesTerritory, returns can be split by category or region without extra columns.
+
+New measures (4):
+- Total Returns - `COUNTROWS(Returns)`
+- Return Rate % - `DIVIDE([Total Returns], [Total Orders], 0)`
+- Return Value Lost - `SUMX(Returns, RELATED(Sales[Sales Amount]))` - counts the full value of each returned line, not prorated by quantity
+- Average Days to Return - `AVERAGE(Returns[Days To Return])`
+
+That brings the model to 32 measures.
+
+### Returns Analysis page
+
+A sixth page. Three cards across the top (Total Returns, Return Rate %, Return Value Lost), then three charts (returns by reason, returns by region, return value lost by region), and a bottom row with return rate by category and a monthly returns trend. Return Rate % also replaced Total Customers on the Exec Summary.
+
+### Layout cleanup
+
+I rebuilt the layouts so every page follows the same rules:
+- Page navigator across the top of every page.
+- KPI cards in a row under the navigator.
+- Charts below the cards, with related visuals grouped together.
+- Equal sizes and gaps, set with exact Size and Position values on a 1280 by 720 canvas instead of dragging by eye.
+- One colour theme for the whole report: a main blue, a muted blue-grey for comparisons, greys for everything else, and red and green kept only for good and bad performance. One font (Segoe UI).
+
+Other small fixes:
+- The Sales Analysis matrix now goes down to Product Name, so you can right-click a product and drill through to Product Detail.
+- The Switch View button has a text label now.
+- I re-checked the bookmarks and the tooltip after moving the visuals.
