@@ -69,13 +69,13 @@ Note: there's no Returns table in the AdventureWorks dataset, so at first I skip
 **Time intelligence**
 - Sales YTD - `CALCULATE(TOTALYTD([Total Sales], Calendar[Date]), REMOVEFILTERS(Calendar[Year]))`
 - Sales PY - `CALCULATE([Total Sales], SAMEPERIODLASTYEAR(Calendar[Date]))`
-- Sales YoY Change $ (VAR) - current minus prior, both pulled from the two measures above
-- Sales YoY Change % (VAR) - same idea, divided
+- Sales YoY Change $ (VAR) - sales for the latest year so far (1 January to the last date in the data) minus the same dates one year earlier. I rewrote this after the first submission, see the year-over-year note at the bottom.
+- Sales YoY Change % (VAR) - the same comparison as a percentage. Also rewritten after the first submission.
 - Sales MTD - `TOTALMTD([Total Sales], Calendar[Date])`
 - Sales QTD - `TOTALQTD([Total Sales], Calendar[Date])`
 - Rolling 3-Month Sales / Rolling 12-Month Sales (VAR) - `DATESINPERIOD` going back 3 or 12 months from the max date in context
 
-Tested these in a matrix with Year on rows - PY comes back blank for year one and YoY correctly picks up the prior year everywhere else, so I'm confident these are right.
+I tested Sales PY in a matrix with Year on rows - it comes back blank for year one and picks up the prior year everywhere else. The two YoY measures were rewritten later, see the year-over-year note at the bottom.
 
 **Error handling**
 Every DIVIDE uses the third-argument fallback (0) instead of wrapping in IFERROR - cleaner and it's the recommended pattern.
@@ -134,7 +134,7 @@ Built out a 5-page report (a 6th page, Returns Analysis, was added later).
 
 **Calculation groups** - Built a Time Intelligence calc group in Tabular Editor 3 with six items: Current Period, Prior Year, YoY Change $, YoY Change %, YTD, MTD. Each wraps `SELECTEDMEASURE()` with the relevant pattern. The point of doing this instead of writing separate YTD/PY/YoY measures for every metric is that one slicer now flips the time-period behaviour for every measure on the page at once - way less duplicated logic to maintain. Applied it to Sales Analysis and the Tooltip page.
 
-**Sales Analysis page** - Matrix of Category/Subcategory against Total Sales, Gross Profit, Sales YoY Change %, Gross Profit Margin %. Reading the plan literally, the field parameters don't replace the matrix's own columns - they drive a separate clustered column chart instead, letting users flip its metric and axis. The calc group slicer sits on the matrix so all six time-period views work across every value at once. Conditional formatting: red/green gradient on YoY %, threshold colours on Gross Profit Margin % (red under 20%, yellow 20–40%, green 40%+).
+**Sales Analysis page** - Matrix of Category/Subcategory against Total Sales, Gross Profit, Sales YoY Change %, Gross Profit Margin %. Reading the plan literally, the field parameters don't replace the matrix's own columns - they drive a separate clustered column chart instead, letting users flip its metric and axis. The calc group slicer sits on the matrix so all six time-period views work across every value at once. Conditional formatting uses rules on both columns: Sales YoY Change % is green when positive and red when negative, and Gross Profit Margin % is red under 20%, yellow from 20% to 40%, and green from 40% up. YoY started as a red/green gradient, but one very large value stretched the scale and showed real growth in red, so I switched to simple rules.
 
 **Conditional visibility**, two patterns here:
 1. Bar/line toggle for the Total Sales by Category chart - two versions stacked via the Selection Pane, two bookmarks ("Show Bar"/"Show Line") grouped separately from page-nav bookmarks so they don't interfere, wired to a Switch View button.
@@ -240,3 +240,21 @@ Other small fixes:
 - The Sales Analysis matrix now goes down to Product Name, so you can right-click a product and drill through to Product Detail.
 - The Switch View button has a text label now.
 - I re-checked the bookmarks and the tooltip after moving the visuals.
+
+### Year-over-year fix
+
+When I rechecked my insights summary, the headline year-over-year figure on the Exec Summary (about -58%) didn't make sense next to the yearly sales chart. The original `Sales YoY Change %` took year to date (1 January to 15 June 2020) and compared it with `Sales PY`. With no date selected, `Sales PY` is every date in the report shifted back a year, which is several years of sales. So it was comparing part of one year with several years combined.
+
+I rewrote `Sales YoY Change %` and `Sales YoY Change $` to compare the latest year so far with the same dates one year earlier:
+
+```DAX
+Sales YoY Change % =
+VAR LatestDay = CALCULATE(MAX(Calendar[Date]), ALL(Calendar[Date]))
+VAR YearStartDay = DATE(YEAR(LatestDay), 1, 1)
+VAR CurrentAmount = CALCULATE([Total Sales], DATESBETWEEN(Calendar[Date], YearStartDay, LatestDay))
+VAR PriorAmount = CALCULATE([Total Sales], DATESBETWEEN(Calendar[Date], EDATE(YearStartDay, -12), EDATE(LatestDay, -12)))
+RETURN
+    DIVIDE(CurrentAmount - PriorAmount, PriorAmount, 0)
+```
+
+The overall figure is now +71.0%, and every category is up: Clothing +100.7%, Bikes +69.5%, Components +48.4% and Accessories +880.8% (from a very small base). `Sales PY`, `Sales YTD`, `Sales MTD` and `Sales QTD` are unchanged. The `YoY Change %` option in the calculation group still uses the older pattern, so with no dates selected it can show the same kind of mismatch, and I don't rely on it.
