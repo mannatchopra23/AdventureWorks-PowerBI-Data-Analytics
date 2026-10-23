@@ -21,9 +21,7 @@ This is my AdventureWorks Power BI project - a 4-week build covering data modell
 ![Model view](assets/model-screenshot.png)
 
 ## Video walkthrough
-[Watch the walkthrough on Loom](https://www.loom.com/share/2988de1f1aa94f219ef0830fb877b5e6)
-
-This video was recorded before I added the Returns page and tidied the layouts, so it shows the earlier version of the report.
+[Watch the walkthrough on Loom](https://www.loom.com/share/628ddfdd1efb4c85851db8c2339af319)
 
 ---
 
