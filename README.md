@@ -18,7 +18,7 @@ This is my AdventureWorks Power BI project - a 4-week build covering data modell
 6. The Dynamic Employee Territory role uses `USERPRINCIPALNAME()`, which won't actually return anything in Desktop - it only works once published to the Service with Pro. I documented it but couldn't fully test it locally.
 
 ## Model screenshot
-![Model view](assets/model-screenshot.png)
+![Model view](assets/Screenshot%20%28421%29.png)
 
 ## Video walkthrough
 [Watch the walkthrough on Loom](https://www.loom.com/share/628ddfdd1efb4c85851db8c2339af319)
